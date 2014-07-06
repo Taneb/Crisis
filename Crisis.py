@@ -1,4 +1,7 @@
 from operator import or_
+from random import Random
+
+import const
 
 # very magic numbers that are fun to fiddle with
 OCCAM = 2
@@ -6,22 +9,16 @@ SUN_TZU = 10
 
 # this is the function to mess with!
 def weight_answer(remaining_ships_count, pop=None):
-    return (remaining_ships_count + 1)**OCCAM * (SUN_TZU if pop is None else pop)
-
-MISS = False
-HIT = True
-
-DESTROYER = 0
-CRUISER = 1
-BATTLESHIP = 2
-HOVERCRAFT = 4
-AIRCRAFT_CARRIER = 5
+    part1 = (remaining_ships_count + 1) ** OCCAM
+    part2 = SUN_TZU if pop is None else pop
+    return part1 * part2
 
 def is_valid_ship(ship):
-    return type(ship) is int and ship >= 0 and ship < 6
+    return type(ship) is int and ship >= 10 and ship < 15
 
 def is_valid_ship_list(ship_list):
-    return type(ship_list) is int and ship_list >= 0 and ship_list < 64
+    return (type(ship_list) is int and ship_list >= 0 and 
+            ship_list <= 31744  and ship_list % 1024 == 0)
 
 NORTH = 0
 EAST = 1
@@ -55,17 +52,36 @@ def coord_to_bit(coord):
         bit_pos = coord[0] + 12 * coord[1] - 36
     return 2L ** bit_pos
 
+def board_to_jagged_array(board):
+    assert type(board) is long
+    assert board >= 0
+    assert board < 2**108
+    
+    result = []
+    for i in range(6):
+        result.append([])
+        for j in range(6):
+            result[-1].append(const.HIT if board & 1 else const.MISS)
+            result >>= 1
+    for i in range(6):
+        result.append([])
+        for j in range(12):
+            result[-1].append(const.HIT if board & 1 else const.MISS)
+            result >>= 1
+    
+    return result
+
 def all_positions_of(ship):
     assert(is_valid_ship(ship))
-    if ship == DESTROYER:
+    if ship == const.DESTROYER:
         pattern = {(0,0),(0,1)}
-    elif ship == CRUISER:
+    elif ship == const.CRUISER:
         pattern = {(0,0),(0,1),(0,2)}
-    elif ship == BATTLESHIP:
+    elif ship == const.BATTLESHIP:
         pattern = {(0,0),(0,1),(0,2),(0,3)}
-    elif ship == HOVERCRAFT:
+    elif ship == const.HOVERCRAFT:
         pattern = {(0,0),(0,1),(1,1),(1,2),(2,0),(2,1)}
-    elif ship == AIRCRAFT_CARRIER:
+    elif ship == const.AIRCRAFT_CARRIER:
         pattern = {(0,0),(0,1),(0,2),(1,1),(2,1),(3,1)}
     else:
         raise AssertionError
@@ -119,7 +135,8 @@ def popcount(binary_number):
     return result
 
 class Universe():
-    def __init__(self, registry, assumed_ship_positions, remaining_ships, misses):
+    def __init__(self, registry, assumed_ship_positions, 
+                 remaining_ships, misses):
         assert(type(registry) is dict)
         self.__registry__ = registry
         registry[id(self)] = self
@@ -150,10 +167,10 @@ class Universe():
 
     def update(self, coord, result):
         assert(is_valid_coord(coord))
-        if (result == HIT and
+        if (result == const.HIT and
             coord_to_bit(coord) & self.__assumed_ship_positions__ == 0L):
             self.__spawn__(coord_to_bit(coord))
-        elif result == MISS:
+        elif result == const.MISS:
             self.__remove__()
 
     def query(self, empty_cells, callback):
@@ -183,11 +200,19 @@ class Universe():
         del self.__registry__[id(self)]
 
 class Player():
+    def __init__(self):
+        self._playerName = "Crisis"
+        self._playerDescription = "Crisis on finite worlds."
+        self.misses = [0L]
+        self.registry = {}
+        self.empty_cells = 2**108 - 1
+
     def newRound(self):
         self.misses = [0L]
         self.registry = {}
-        self.empty_cells = 2*108 - 1
+        self.empty_cells = 2**108 - 1
         Universe(registry, 0L, initial_ship_list, self.misses)
+
     def chooseMove(self):
         final_scores = [0]*108
         def callback(scores):
@@ -208,12 +233,42 @@ class Player():
                 bests.append(coord)
 
         #TODO: choose randomly
-        coord = bests[0]
+        r = Random()
+        coord = r.choice(bests)
         if coord < 36:
             return (coord % 6, coord // 6)
         else:
             coord += 36
             return (coord % 12, coord // 12)
 
-    def setOutcome(self, outcome):
-        pass
+    def setOutcome(self, outcome, row, col):
+        for universe in self.registry.itervalues():
+            universe.update((row, col), outcome)
+
+    def deployFleet(self):
+        r = Random()
+        while True:
+            fleet = r.choice(all_positions_of(const.CARRIER))
+            h = r.choice(all_positions_of(const.HOVERCRAFT))
+            if fleet & h == 0:
+                fleet |= h
+            else:
+                continue
+            b = r.choice(all_positions_of(const.BATTLESHIP))
+            if fleet & b == 0:
+                fleet |= b
+            else:
+                continue
+            c = r.choice(all_positions_of(const.CRUISER))
+            if fleet & c == 0:
+                fleet |= c
+            else:
+                continue
+            d = r.choice(all_positions_of(const.DESTROYER))
+            if fleet & d == 0:
+                fleet |= c
+            else:
+                continue
+            break
+        
+        

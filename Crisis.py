@@ -1,11 +1,76 @@
 from operator import or_
 from random import Random
 
-import const
+# import const
+# from base_player import BasePlayer
+
+UNKOWN = 0
+EMPTY = 1
+OCCUPIED = 2
+MISSED = 3
+HIT = 4
+
+CARRIER = 10
+HOVERCRAFT = 11
+BATTLESHIP = 12
+CRUISER = 13
+DESTROYER = 14
+
+class BasePlayer:
+    # Initialise the boards: player to empty, opponent to unknown
+    def __init__(self):
+        self._playerName = "Unknown"
+        self._playerDescription = "None"
+    
+    def getName(self):
+        return self._playerName
+
+
+    def getDescription(self):
+        return self._playerDescription
+
+       # Distribute the fleet onto your board
+    def deployFleet(self):
+        """
+        Decide where you want your fleet to be deployed, then return your board. 
+        """
+        pass
+
+
+    # Decide what move to make based on current state of opponent's board and print it out
+    def chooseMove(self):
+        """
+        Decide what move to make based on current state of opponent's board and return it 
+        """
+
+        pass
+
+
+    def setOutcome(self, entry, i1, i2):
+        """
+        Read the outcome of the shot from the keyboard
+        expected value is const.HIT for hit and const.MISSED for missed
+        """
+        pass
+
+
+    def getOpponentMove(self, i1,i2):
+        """ You might like to keep track of where your opponent has missed, but here we just acknowledge it
+        """
+        pass
+
+    def newRound(self):
+
+        pass
+
+    def newPlayer(self, name = None):
+
+        pass
+
 
 # very magic numbers that are fun to fiddle with
 OCCAM = 2
-SUN_TZU = 10
+SUN_TZU = 10000
 
 # this is the function to mess with!
 def weight_answer(remaining_ships_count, pop=None):
@@ -17,6 +82,7 @@ def is_valid_ship(ship):
     return type(ship) is int and ship >= 10 and ship < 15
 
 def is_valid_ship_list(ship_list):
+    return True
     return (type(ship_list) is int and ship_list >= 0 and 
             ship_list <= 31744  and ship_list % 1024 == 0)
 
@@ -61,32 +127,32 @@ def board_to_jagged_array(board):
     for i in range(6):
         result.append([])
         for j in range(6):
-            result[-1].append(const.HIT if board & 1 else const.MISS)
-            result >>= 1
+            result[-1].append(OCCUPIED if board & 1 else EMPTY)
+            board >>= 1
     for i in range(6):
         result.append([])
         for j in range(12):
-            result[-1].append(const.HIT if board & 1 else const.MISS)
-            result >>= 1
+            result[-1].append(OCCUPIED if board & 1 else EMPTY)
+            board >>= 1
     
     return result
 
 def all_positions_of(ship):
     assert(is_valid_ship(ship))
-    if ship == const.DESTROYER:
+    if ship == DESTROYER:
         pattern = {(0,0),(0,1)}
-    elif ship == const.CRUISER:
+    elif ship == CRUISER:
         pattern = {(0,0),(0,1),(0,2)}
-    elif ship == const.BATTLESHIP:
+    elif ship == BATTLESHIP:
         pattern = {(0,0),(0,1),(0,2),(0,3)}
-    elif ship == const.HOVERCRAFT:
+    elif ship == HOVERCRAFT:
         pattern = {(0,0),(0,1),(1,1),(1,2),(2,0),(2,1)}
-    elif ship == const.AIRCRAFT_CARRIER:
+    elif ship == CARRIER:
         pattern = {(0,0),(0,1),(0,2),(1,1),(2,1),(3,1)}
     else:
         raise AssertionError
 
-    for x_base, y_base in all_coords:
+    for x_base, y_base in all_coords():
         for direction in xrange(4):
             if direction == NORTH:
                 offset = lambda (x,y):(x_base + x, y_base + y)
@@ -104,7 +170,8 @@ def all_positions_of(ship):
                 yield reduce(or_, map(coord_to_bit, placement))
 
 
-initial_ship_list = 2**6 - 1
+initial_ship_list = (2**15 - 1) ^ (2**9 - 1)
+assert is_valid_ship_list(initial_ship_list)
 
 def is_in_ship_list(ship_list, ship):
     assert(is_valid_ship_list(ship_list))
@@ -151,55 +218,65 @@ class Universe():
         self.__misses__ = misses
 
     def __spawn__(self, coord):
-        for ship in bits_of(self.__remaining_ships__):
+        for ship in [i for i in range(10, 15) if is_in_ship_list(
+                self.__remaining_ships__, i)]:
             for placement in all_positions_of(ship):
                 if placement & coord == 0L:
                     continue
-                if placement & misses[0] != 0L:
+                if placement & self.__misses__[0] != 0L:
                     continue
                 if placement & self.__assumed_ship_positions__ != 0L:
                     continue
                 Universe(self.__registry__,
-                         self.__assumed_ship_positions | placement,
+                         self.__assumed_ship_positions__ | placement,
                          remove_from_ship_list(self.__remaining_ships__, ship),
-                         misses)
+                         self.__misses__)
         self.__remove__()
 
     def update(self, coord, result):
         assert(is_valid_coord(coord))
-        if (result == const.HIT and
+        if (result == HIT and
             coord_to_bit(coord) & self.__assumed_ship_positions__ == 0L):
             self.__spawn__(coord_to_bit(coord))
-        elif result == const.MISS:
+        elif (result == MISSED and
+              coord_to_bit(coord) & self.__assumed_ship_positions__ != 0L):
             self.__remove__()
 
     def query(self, empty_cells, callback):
         assert(type(empty_cells) is long)
         number_of_remaining_ships = popcount(self.__remaining_ships__)
         result = [0] * 108
+
+        # set all empty coords that we are assuming are hits to None
         for i, x in enumerate(bits_of(empty_cells)):
-            if x == 0:
+            if not bool(x):
                 continue
-            if x & self.__assumed_ship_positions__ != 0L:
+            if (1<<i) & self.__assumed_ship_positions__ != 0L:
                 result[i] = None
                 continue
-        for ship in bits_of(self.__remaining_ships__):
+
+
+        for ship in [i for i in range(10, 15) if is_in_ship_list(
+                self.__remaining_ships__, i)]:
             for placement in all_positions_of(ship):
-                if placement & empty_cells == placement:
-                    x = 0
-                    y = 1
-                    while y <= placement:
-                        if y & placement:
-                            result[x] += 1
-                        x += 1
-                        y <<= 1
+                if placement & self.__misses__[0] != 0L:
+                    continue
+                if placement & ~empty_cells:
+                    continue
+                x = 0
+                y = 1
+                while y <= placement:
+                    if y & placement != 0L and result[x] is not None:
+                        result[x] += 1
+                    x += 1
+                    y <<= 1
         callback(map(lambda n: weight_answer(number_of_remaining_ships, n),
                      result))
 
     def __remove__(self):
         del self.__registry__[id(self)]
 
-class Player():
+class Player(BasePlayer):
     def __init__(self):
         self._playerName = "Crisis"
         self._playerDescription = "Crisis on finite worlds."
@@ -211,16 +288,17 @@ class Player():
         self.misses = [0L]
         self.registry = {}
         self.empty_cells = 2**108 - 1
-        Universe(registry, 0L, initial_ship_list, self.misses)
+        Universe(self.registry, 0L, initial_ship_list, self.misses)
 
     def chooseMove(self):
+        print len(self.registry)
         final_scores = [0]*108
         def callback(scores):
             for i, score in enumerate(scores):
                 final_scores[i] += score
 
         #TODO: parallelize
-        for universe in self.registry.itervalues():
+        for universe in list(self.registry.itervalues()):
             universe.query(self.empty_cells, callback)
 
         max_score = 0
@@ -232,43 +310,59 @@ class Player():
             elif score == max_score:
                 bests.append(coord)
 
-        #TODO: choose randomly
         r = Random()
         coord = r.choice(bests)
         if coord < 36:
-            return (coord % 6, coord // 6)
+            return (coord // 6, coord % 6)
         else:
             coord += 36
-            return (coord % 12, coord // 12)
+            return (coord // 12, coord % 12)
 
     def setOutcome(self, outcome, row, col):
-        for universe in self.registry.itervalues():
-            universe.update((row, col), outcome)
+        self.empty_cells &= ~coord_to_bit((col,row))
+        if outcome == MISSED:
+            self.misses[0] |= coord_to_bit((col, row))
+        for universe in list(self.registry.itervalues()):
+            universe.update((col, row), outcome)
 
     def deployFleet(self):
         r = Random()
+        fleet = 0L
         while True:
-            fleet = r.choice(all_positions_of(const.CARRIER))
-            h = r.choice(all_positions_of(const.HOVERCRAFT))
-            if fleet & h == 0:
-                fleet |= h
+            a = r.choice(list(all_positions_of(CARRIER)))
+            if fleet & a == 0:
+                fleet |= a
             else:
                 continue
-            b = r.choice(all_positions_of(const.BATTLESHIP))
-            if fleet & b == 0:
-                fleet |= b
+            for z in range(100):
+                h = r.choice(list(all_positions_of(HOVERCRAFT)))
+                if fleet & h == 0:
+                    fleet |= h
+                    break
             else:
                 continue
-            c = r.choice(all_positions_of(const.CRUISER))
-            if fleet & c == 0:
-                fleet |= c
+            for z in range(100):
+                b = r.choice(list(all_positions_of(BATTLESHIP)))
+                if fleet & b == 0:
+                    fleet |= b
+                    break
             else:
                 continue
-            d = r.choice(all_positions_of(const.DESTROYER))
-            if fleet & d == 0:
-                fleet |= c
+            for z in range(100):
+                c = r.choice(list(all_positions_of(CRUISER)))
+                if fleet & c == 0:
+                    fleet |= c
+                    break
+            else:
+                continue
+            for z in range(100):
+                d = r.choice(list(all_positions_of(DESTROYER)))
+                if fleet & d == 0:
+                    fleet |= c
+                    break
             else:
                 continue
             break
+        return board_to_jagged_array(fleet)
         
-        
+getPlayer = lambda: Player()

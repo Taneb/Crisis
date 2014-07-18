@@ -1,5 +1,6 @@
 from operator import or_
 from random import Random
+from itertools import count, compress
 
 # import const
 # from base_player import BasePlayer
@@ -71,6 +72,8 @@ class BasePlayer:
 # very magic numbers that are fun to fiddle with
 OCCAM = 2
 SUN_TZU = 10000
+
+TIMEOUT = 0.97
 
 # this is the function to mess with!
 def weight_answer(remaining_ships_count, pop=None):
@@ -170,7 +173,7 @@ def all_positions_of(ship):
                 yield reduce(or_, map(coord_to_bit, placement))
 
 
-initial_ship_list = (2**15 - 1) ^ (2**9 - 1)
+initial_ship_list = (2**15 - 1) ^ (2**10 - 1)
 assert is_valid_ship_list(initial_ship_list)
 
 def is_in_ship_list(ship_list, ship):
@@ -201,105 +204,51 @@ def popcount(binary_number):
         binary_number &= binary_number - 1
     return result
 
-class Universe():
-    def __init__(self, registry, assumed_ship_positions, 
-                 remaining_ships, misses):
-        assert(type(registry) is dict)
-        self.__registry__ = registry
-        registry[id(self)] = self
-        assert(type(assumed_ship_positions) is long)
-        self.__assumed_ship_positions__ = assumed_ship_positions
-        assert(is_valid_ship_list(remaining_ships))
-        self.__remaining_ships__ = remaining_ships
-        # TODO: figure a nice way to have mutable long ints
-        # one-length lists are nasty :(
-        assert(type(misses) is list and len(misses) == 1)
-        assert(type(misses[0]) is long)
-        self.__misses__ = misses
-
-    def __spawn__(self, coord):
-        for ship in [i for i in range(10, 15) if is_in_ship_list(
-                self.__remaining_ships__, i)]:
-            for placement in all_positions_of(ship):
-                if placement & coord == 0L:
-                    continue
-                if placement & self.__misses__[0] != 0L:
-                    continue
-                if placement & self.__assumed_ship_positions__ != 0L:
-                    continue
-                Universe(self.__registry__,
-                         self.__assumed_ship_positions__ | placement,
-                         remove_from_ship_list(self.__remaining_ships__, ship),
-                         self.__misses__)
-        self.__remove__()
-
-    def update(self, coord, result):
-        assert(is_valid_coord(coord))
-        if (result == HIT and
-            coord_to_bit(coord) & self.__assumed_ship_positions__ == 0L):
-            self.__spawn__(coord_to_bit(coord))
-        elif (result == MISSED and
-              coord_to_bit(coord) & self.__assumed_ship_positions__ != 0L):
-            self.__remove__()
-
-    def query(self, empty_cells, callback):
-        assert(type(empty_cells) is long)
-        number_of_remaining_ships = popcount(self.__remaining_ships__)
-        result = [0] * 108
-
-        # set all empty coords that we are assuming are hits to None
-        for i, x in enumerate(bits_of(empty_cells)):
-            if not bool(x):
-                continue
-            if (1<<i) & self.__assumed_ship_positions__ != 0L:
-                result[i] = None
-                continue
-
-
-        for ship in [i for i in range(10, 15) if is_in_ship_list(
-                self.__remaining_ships__, i)]:
-            for placement in all_positions_of(ship):
-                if placement & self.__misses__[0] != 0L:
-                    continue
-                if placement & ~empty_cells:
-                    continue
-                x = 0
-                y = 1
-                while y <= placement:
-                    if y & placement != 0L and result[x] is not None:
-                        result[x] += 1
-                    x += 1
-                    y <<= 1
-        callback(map(lambda n: weight_answer(number_of_remaining_ships, n),
-                     result))
-
-    def __remove__(self):
-        del self.__registry__[id(self)]
-
 class Player(BasePlayer):
     def __init__(self):
         self._playerName = "Crisis"
         self._playerDescription = "Crisis on finite worlds."
-        self.misses = [0L]
-        self.registry = {}
+        self.misses = 0L
+        self.universes = [(0L, initial_ship_list)]
         self.empty_cells = 2**108 - 1
 
     def newRound(self):
-        self.misses = [0L]
-        self.registry = {}
+        self.misses = 0L
+        self.universes = [(0L, initial_ship_list)]
         self.empty_cells = 2**108 - 1
-        Universe(self.registry, 0L, initial_ship_list, self.misses)
 
     def chooseMove(self):
-        print len(self.registry)
         final_scores = [0]*108
         def callback(scores):
             for i, score in enumerate(scores):
                 final_scores[i] += score
 
-        #TODO: parallelize
-        for universe in list(self.registry.itervalues()):
-            universe.query(self.empty_cells, callback)
+        empty_cells = self.empty_cells
+
+        for universe, rem_ships in self.universes[:100]:
+            number_of_remaining_ships = popcount(rem_ships)
+
+            for i in compress(count(0), bits_of(empty_cells)):
+
+                if (1<<i) & universe != 0L:
+                    final_scores[i] += weight_answer(number_of_remaining_ships, None)
+                    continue
+            
+            for ship in (i for i in range(10, 15) if is_in_ship_list(rem_ships, i)):
+                for placement in all_positions_of(ship):
+                    if placement & self.misses != 0L:
+                        continue
+                    if placement & ~empty_cells != 0L:
+                        continue
+                    if placement & universe != 0L:
+                        continue
+                    x = 0
+                    y = 1
+                    while y <= placement:
+                        if y & placement != 0L:
+                            final_scores[x] += weight_answer(number_of_remaining_ships, 1)
+                        x += 1
+                        y <<= 1
 
         max_score = 0
         bests = []
@@ -320,10 +269,27 @@ class Player(BasePlayer):
 
     def setOutcome(self, outcome, row, col):
         self.empty_cells &= ~coord_to_bit((col,row))
+        coord = coord_to_bit((col, row))
         if outcome == MISSED:
-            self.misses[0] |= coord_to_bit((col, row))
-        for universe in list(self.registry.itervalues()):
-            universe.update((col, row), outcome)
+            self.misses |= coord_to_bit((col, row))
+            new_universes = filter(lambda (a, b): coord & a == 0L, self.universes)
+        elif outcome == HIT:
+            new_universes = []
+            for universe, ship_list in self.universes:
+                if coord & universe == 0L:
+                    for ship in (i for i in xrange(10,15) if is_in_ship_list(ship_list, i)):
+                        for placement in all_positions_of(ship):
+                            if placement & coord == 0L:
+                                continue
+                            if placement & self.misses != 0L:
+                                continue
+                            if placement & universe != 0L:
+                                continue
+                            new_universes.append((universe | placement, remove_from_ship_list(ship_list, ship)))
+                else:
+                    new_universes.append((universe, ship_list))
+
+        self.universes = new_universes
 
     def deployFleet(self):
         r = Random()
@@ -358,7 +324,7 @@ class Player(BasePlayer):
             for z in range(100):
                 d = r.choice(list(all_positions_of(DESTROYER)))
                 if fleet & d == 0:
-                    fleet |= c
+                    fleet |= d
                     break
             else:
                 continue

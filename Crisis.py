@@ -17,51 +17,28 @@ def weight_answer(remaining_ships_count, pop=None):
     part2 = SUN_TZU if pop is None else pop
     return part1 * part2
 
-def is_valid_ship(ship):
-    return type(ship) is int and ship >= 10 and ship < 15
-
-def is_valid_ship_list(ship_list):
-    return True
-    return (type(ship_list) is int and ship_list >= 0 and 
-            ship_list <= 31744  and ship_list % 1024 == 0)
-
 NORTH = 0
 EAST = 1
 SOUTH = 2
 WEST = 3
 
-def is_valid_direction(direction):
-    return type(direction) is int and direction >= 0 and direction < 4
-
 def is_valid_coord(coord):
-    if type(coord) is not tuple:
-        return False
-    if len(coord) != 2:
-        return False
-    if type(coord[0]) is not int or type(coord[1]) is not int:
-        return False
     return (coord[0] >= 0 and coord[1] >= 0 and
             coord[1] < 12 and coord[0] < (6 if coord[1] < 6 else 12))
 
 def all_coords():
     for y in xrange(12):
         for x in xrange(6 if y < 6 else 12):
-            assert(is_valid_coord((x,y)))
             yield (x,y)
 
 def coord_to_bit(coord):
-    assert(is_valid_coord(coord))
     if coord[1] < 6:
         bit_pos = coord[0] + 6 * coord[1]
     else:
         bit_pos = coord[0] + 12 * coord[1] - 36
-    return 2L ** bit_pos
+    return 1L << bit_pos
 
 def board_to_jagged_array(board):
-    assert type(board) is long
-    assert board >= 0
-    assert board < 2**108
-    
     result = []
     for i in range(6):
         result.append([])
@@ -77,7 +54,6 @@ def board_to_jagged_array(board):
     return result
 
 def all_positions_of(ship):
-    assert(is_valid_ship(ship))
     if ship == const.DESTROYER:
         pattern = {(0,0),(0,1)}
     elif ship == const.CRUISER:
@@ -99,8 +75,6 @@ def all_positions_of(ship):
                 offset = lambda (x,y): (x_base - x, y_base - y)
             elif direction == WEST:
                 offset = lambda (x,y): (x_base - y, y_base + x)
-            else:
-                raise AssertionError
 
             placement = map(offset, pattern)
             if all(map(is_valid_coord, placement)):

@@ -192,41 +192,19 @@ class Player(BasePlayer):
     def deployFleet(self):
         r = Random()
         fleet = 0L
-        while True:
-            a = r.choice(list(all_positions_of(const.CARRIER)))
-            if fleet & a == 0:
-                fleet |= a
-            else:
-                continue
-            for z in range(100):
-                h = r.choice(list(all_positions_of(const.HOVERCRAFT)))
-                if fleet & h == 0:
-                    fleet |= h
+        fleet_incomplete = True
+        while fleet_incomplete:
+            fleet_incomplete = False
+            for ship in [const.CARRIER, const.HOVERCRAFT, const.BATTLESHIP, const.CRUISER, const.DESTROYER]:
+                for z in range(100):
+                    p = r.choice(list(all_positions_of(ship)))
+                    if fleet & p == 0:
+                        fleet |= p
+                        break
+                else:
+                    fleet_incomplete = True
                     break
-            else:
-                continue
-            for z in range(100):
-                b = r.choice(list(all_positions_of(const.BATTLESHIP)))
-                if fleet & b == 0:
-                    fleet |= b
-                    break
-            else:
-                continue
-            for z in range(100):
-                c = r.choice(list(all_positions_of(const.CRUISER)))
-                if fleet & c == 0:
-                    fleet |= c
-                    break
-            else:
-                continue
-            for z in range(100):
-                d = r.choice(list(all_positions_of(const.DESTROYER)))
-                if fleet & d == 0:
-                    fleet |= d
-                    break
-            else:
-                continue
-            break
+
         return board_to_jagged_array(fleet)
         
-getPlayer = lambda: Player()
+getPlayer = Player

@@ -1,15 +1,16 @@
 from operator import or_
 from random import Random
 from itertools import count, compress
+from time import clock
 
 import const
 from base_player import BasePlayer
 
 # very magic numbers that are fun to fiddle with
 OCCAM = 2
-SUN_TZU = 10000
+SUN_TZU = 100
 
-TIMEOUT = 0.97
+TIMEOUT = 9
 
 # this is the function to mess with!
 def weight_answer(remaining_ships_count, pop=None):
@@ -23,10 +24,12 @@ SOUTH = 2
 WEST = 3
 
 def is_valid_coord(coord):
+    """Checks if a coord represented as a 2-tuple of ints is on the board."""
     return (coord[0] >= 0 and coord[1] >= 0 and
             coord[1] < 12 and coord[0] < (6 if coord[1] < 6 else 12))
 
 def all_coords():
+    """Generates each coord on the board."""
     for y in xrange(12):
         for x in xrange(6 if y < 6 else 12):
             yield (x,y)
@@ -53,7 +56,7 @@ def board_to_jagged_array(board):
     
     return result
 
-def all_positions_of(ship):
+def all_positions_of_(ship):
     if ship == const.DESTROYER:
         pattern = {(0,0),(0,1)}
     elif ship == const.CRUISER:
@@ -80,6 +83,7 @@ def all_positions_of(ship):
             if all(map(is_valid_coord, placement)):
                 yield reduce(or_, map(coord_to_bit, placement))
 
+all_positions_of = {ship : list(all_positions_of_(ship)) for ship in range(10,15)}
 
 initial_ship_list = (2**15 - 1) ^ (2**10 - 1)
 
@@ -120,20 +124,16 @@ class Player(BasePlayer):
         def callback(scores):
             for i, score in enumerate(scores):
                 final_scores[i] += score
-
         empty_cells = self.empty_cells
-
-        for universe, rem_ships in self.universes[:100]:
+        start = clock()
+        for universe, rem_ships in self.universes:
             number_of_remaining_ships = popcount(rem_ships)
-
             for i in compress(count(0), bits_of(empty_cells)):
-
                 if (1<<i) & universe != 0L:
                     final_scores[i] += weight_answer(number_of_remaining_ships, None)
                     continue
-            
             for ship in (i for i in range(10, 15) if is_in_ship_list(rem_ships, i)):
-                for placement in all_positions_of(ship):
+                for placement in all_positions_of[ship]:
                     if placement & self.misses != 0L:
                         continue
                     if placement & ~empty_cells != 0L:
@@ -147,7 +147,8 @@ class Player(BasePlayer):
                             final_scores[x] += weight_answer(number_of_remaining_ships, 1)
                         x += 1
                         y <<= 1
-
+            if clock() - start >= TIMEOUT:
+                break
         max_score = 0
         bests = []
         for coord, score in enumerate(final_scores):
@@ -156,7 +157,6 @@ class Player(BasePlayer):
                 bests = [coord]
             elif score == max_score:
                 bests.append(coord)
-
         r = Random()
         coord = r.choice(bests)
         if coord < 36:
@@ -170,23 +170,23 @@ class Player(BasePlayer):
         coord = coord_to_bit((col, row))
         if outcome == const.MISSED:
             self.misses |= coord_to_bit((col, row))
-            new_universes = filter(lambda (a, b): coord & a == 0L, self.universes)
+            new_universes = [(a, b) for (a, b) in self.universes if coord & a == 0L]
         elif outcome == const.HIT:
             new_universes = []
+            append = new_universes.append # method lookup is apparently slow
             for universe, ship_list in self.universes:
                 if coord & universe == 0L:
                     for ship in (i for i in xrange(10,15) if is_in_ship_list(ship_list, i)):
-                        for placement in all_positions_of(ship):
+                        for placement in all_positions_of[ship]:
                             if placement & coord == 0L:
                                 continue
                             if placement & self.misses != 0L:
                                 continue
                             if placement & universe != 0L:
                                 continue
-                            new_universes.append((universe | placement, remove_from_ship_list(ship_list, ship)))
+                            append((universe | placement, remove_from_ship_list(ship_list, ship)))
                 else:
-                    new_universes.append((universe, ship_list))
-
+                    append((universe, ship_list))
         self.universes = new_universes
 
     def deployFleet(self):
@@ -197,14 +197,13 @@ class Player(BasePlayer):
             fleet_incomplete = False
             for ship in [const.CARRIER, const.HOVERCRAFT, const.BATTLESHIP, const.CRUISER, const.DESTROYER]:
                 for z in range(100):
-                    p = r.choice(list(all_positions_of(ship)))
+                    p = r.choice(all_positions_of[ship])
                     if fleet & p == 0:
                         fleet |= p
                         break
                 else:
                     fleet_incomplete = True
                     break
-
         return board_to_jagged_array(fleet)
         
 getPlayer = Player

@@ -163,10 +163,10 @@ class Player(BasePlayer):
             return (coord // 12, coord % 12)
 
     def setOutcome(self, outcome, row, col):
-        self.empty_cells &= ~coord_to_bit((col,row))
         coord = coord_to_bit((col, row))
+        self.empty_cells &= ~coord
         if outcome == const.MISSED:
-            self.misses |= coord_to_bit((col, row))
+            self.misses |= coord
             new_universes = [(a, b) for (a, b) in self.universes if coord & a == 0L]
         elif outcome == const.HIT:
             new_universes = []

@@ -90,9 +90,6 @@ initial_ship_list = (2**15 - 1) ^ (2**10 - 1)
 def is_in_ship_list(ship_list, ship):
     return bool(ship_list & 2**ship)
 
-def remove_from_ship_list(ship_list, ship):
-    return ship_list - 2 ** ship
-
 def bits_of(binary_number):
     bit = 1
     while bit <= binary_number:
@@ -184,7 +181,7 @@ class Player(BasePlayer):
                                 continue
                             if placement & universe != 0L:
                                 continue
-                            append((universe | placement, remove_from_ship_list(ship_list, ship)))
+                            append((universe | placement, ship_list - 2**ship))
                 else:
                     append((universe, ship_list))
         self.universes = new_universes

@@ -118,9 +118,6 @@ class Player(BasePlayer):
 
     def chooseMove(self):
         final_scores = [0]*108
-        def callback(scores):
-            for i, score in enumerate(scores):
-                final_scores[i] += score
         empty_cells = self.empty_cells
         start = clock()
         for universe, rem_ships in self.universes:

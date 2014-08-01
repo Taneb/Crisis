@@ -128,11 +128,7 @@ class Player(BasePlayer):
                     continue
             for ship in (i for i in range(10, 15) if is_in_ship_list(rem_ships, i)):
                 for placement in all_positions_of[ship]:
-                    if placement & self.misses != 0L:
-                        continue
-                    if placement & ~empty_cells != 0L:
-                        continue
-                    if placement & universe != 0L:
+                    if placement & (self.misses | ~empty_cells | universe) != 0L:
                         continue
                     x = 0
                     y = 1

@@ -18,11 +18,6 @@ def weight_answer(remaining_ships_count, pop=None):
     part2 = SUN_TZU if pop is None else pop
     return part1 * part2
 
-NORTH = 0
-EAST = 1
-SOUTH = 2
-WEST = 3
-
 def is_valid_coord(coord):
     """Checks if a coord represented as a 2-tuple of ints is on the board."""
     return (coord[0] >= 0 and coord[1] >= 0 and
@@ -69,15 +64,11 @@ def all_positions_of_(ship):
         pattern = {(0,0),(0,1),(0,2),(1,1),(2,1),(3,1)}
 
     for x_base, y_base in all_coords():
-        for direction in xrange(4):
-            if direction == NORTH:
-                offset = lambda (x,y):(x_base + x, y_base + y)
-            elif direction == EAST:
-                offset = lambda (x,y): (x_base + y, y_base - x)
-            elif direction == SOUTH:
-                offset = lambda (x,y): (x_base - x, y_base - y)
-            elif direction == WEST:
-                offset = lambda (x,y): (x_base - y, y_base + x)
+        for offset in [
+            lambda (x,y):(x_base + x, y_base + y),
+            lambda (x,y): (x_base + y, y_base - x),
+            lambda (x,y): (x_base - x, y_base - y),
+            lambda (x,y): (x_base - y, y_base + x)]:
 
             placement = map(offset, pattern)
             if all(map(is_valid_coord, placement)):

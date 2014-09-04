@@ -76,10 +76,10 @@ def all_positions_of_(ship):
 
 all_positions_of = {ship : list(all_positions_of_(ship)) for ship in range(10,15)}
 
-initial_ship_list = (2**15 - 1) ^ (2**10 - 1)
+initial_ship_list = (1<<15 - 1) ^ (1<<10 - 1)
 
 def is_in_ship_list(ship_list, ship):
-    return bool(ship_list & 2**ship)
+    return bool(ship_list & 1<<ship)
 
 def bits_of(binary_number):
     bit = 1
@@ -100,12 +100,12 @@ class Player(BasePlayer):
         self._playerDescription = "Crisis on finite worlds."
         self.misses = 0L
         self.universes = [(0L, initial_ship_list)]
-        self.empty_cells = 2**108 - 1
+        self.empty_cells = 1<<108 - 1
 
     def newRound(self):
         self.misses = 0L
         self.universes = [(0L, initial_ship_list)]
-        self.empty_cells = 2**108 - 1
+        self.empty_cells = 1<<108 - 1
 
     def chooseMove(self):
         final_scores = [0]*108
@@ -165,7 +165,7 @@ class Player(BasePlayer):
                                 continue
                             if placement & universe != 0L:
                                 continue
-                            append((universe | placement, ship_list - 2**ship))
+                            append((universe | placement, ship_list - 1<<ship))
                 else:
                     append((universe, ship_list))
         self.universes = new_universes

@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 module Crisis.Util where
 
 import Data.Bits
@@ -14,7 +15,9 @@ instance Bits Board where
   popCount (Board l h) = popCount l + popCount h
   testBit (Board l h) n = if n < 64 then testBit l n else testBit h (n - 64)
   bit n = if n < 64 then Board (bit n) 0 else Board 0 (bit (n - 64))
+#ifdef GHC78
   bitSizeMaybe _ = Just 128
+#endif
   bitSize _ = 128
   isSigned _ = False
   shift _ _ = undefined

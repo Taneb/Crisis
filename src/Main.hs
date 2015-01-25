@@ -3,6 +3,8 @@ module Main (main) where
 import Control.Monad
 import Data.Bits
 import Data.List
+import Data.Vector (Vector)
+import qualified Data.Vector as V
 import System.Console.ANSI
 import System.Random
 
@@ -47,7 +49,7 @@ genBoard g0 = head $ do
   return (a, g5)
   where
     genShip :: RandomGen g => Ship -> Board -> g -> ([Board], g)
-    genShip s b ga = let (s', gb) = shuffle (allPositionsOf s) ga
+    genShip s b ga = let (s', gb) = shuffle (V.toList $ allPositionsOf s) ga
                      in flip (,) gb $ do
                        sp <- s'
                        guard (sp .&. b == Board 0 0)
@@ -62,7 +64,7 @@ genBoard g0 = head $ do
 uncurry3 :: (t1 -> t2 -> t3 -> t) -> (t1, t2, t3) -> t
 uncurry3 f (x,y,z) = f x y z
 
-re :: Board -> (Board, [(Board, Int)], Board) -> Int -> IO Int
+re :: Board -> (Board, Vector (Board, Int), Board) -> Int -> IO Int
 re board c@(x,_,y) n = do
   putStrLn $ showBoard x (complement y .&. complement x)
   print n
@@ -86,7 +88,7 @@ sample size = do
       print n
       r <- newStdGen
       let (b, _) = genBoard r
-      x <- re b (Board 0 0, [(Board 0 0,initialShipList)], Board 18446744073709551615 17592186044415) 0
+      x <- re b (Board 0 0, V.singleton (Board 0 0,initialShipList), Board 18446744073709551615 17592186044415) 0
       fmap (x:) (go (n - 1))
 
 main :: IO ()

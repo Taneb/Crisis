@@ -6,6 +6,8 @@ import Data.Array.IArray
 import Data.Array.ST
 import Data.Bits
 import Data.Tuple
+import Data.Vector (Vector)
+import qualified Data.Vector as V
 
 import Crisis.Util
 
@@ -24,11 +26,11 @@ coordToBit (x, y) | y < 6 = x + 6 * y
 isInShipList :: Ship -> Int -> Bool
 isInShipList ship shipList = testBit shipList (fromEnum ship)
 
-chooseMove :: Board -> [(Board, Int)] -> Board -> Maybe (Int, Int)
+chooseMove :: Board -> Vector (Board, Int) -> Board -> Maybe (Int, Int)
 chooseMove misses universes emptycells =
   let finalScores = runSTUArray $ do
         r <- newArray (0,107) 0 :: ST s (STUArray s Int Int)
-        forM_ universes $ scoreUniverse r
+        V.forM_ universes $ scoreUniverse r
         return r
       (bestscore, bests) =
         foldr (\(i, this) (score, bs) ->
@@ -62,16 +64,16 @@ chooseMove misses universes emptycells =
         -- hasn't already been placed.
         scorePart2 =
           forM_ [i|i<-[Destroyer .. Carrier],i`isInShipList`remShips] $ \ship ->
-          forM_ (allPositionsOf ship) $ \placement ->
+          V.forM_ (allPositionsOf ship) $ \placement ->
           when (placement.&.(misses.|.complement emptycells.|.universe) == Board 0 0) $
           forM_ oiot $ \i ->
           when (testBit placement i) $ do
             x <- readArray finalScores i
             writeArray finalScores i (x + 1 + noRemShips)
 
-setOutcome :: Board -> [(Board, Int)] -> Board ->
+setOutcome :: Board -> Vector (Board, Int) -> Board ->
               (Int, Int) -> Bool -> 
-              (Board, [(Board, Int)], Board)
+              (Board, Vector (Board, Int), Board)
 setOutcome misses universes emptycells coord0 outcome =
   let coord = bit $  coordToBit coord0
       newemptycells = emptycells .&. complement coord
@@ -81,7 +83,7 @@ setOutcome misses universes emptycells coord0 outcome =
           (universe, remships) <- universes
           if coord .&. universe == Board 0 0
             then do
-            ship <- [i | i <- [Destroyer .. Carrier], i `isInShipList` remships]
+            ship <- V.fromList [i | i <- [Destroyer .. Carrier], i `isInShipList` remships]
             placement <- allPositionsOf ship
             guard $ placement .&. coord /= Board 0 0
             guard $ placement .&. misses == Board 0 0
@@ -89,6 +91,8 @@ setOutcome misses universes emptycells coord0 outcome =
             return (universe .|. placement, remships - bit (fromEnum ship))
             else return (universe, remships)
         else
-          [(a, b) | (a, b) <- universes, coord .&. a == Board 0 0]
-
+          do
+            (a, b) <- universes
+            guard $ coord .&. a == Board 0 0
+            return (a, b)
   in (if outcome then misses else misses .|. coord, newuniverses, newemptycells)

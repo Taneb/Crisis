@@ -5,9 +5,10 @@ import Control.Monad.ST
 import Data.Array.IArray
 import Data.Array.ST
 import Data.Bits
+import Data.Foldable (foldMap)
 import Data.Tuple
-import Data.Vector (Vector)
-import qualified Data.Vector as V
+import Data.Vector.Unboxed (Vector)
+import qualified Data.Vector.Unboxed as V
 
 import Crisis.Util
 
@@ -83,7 +84,7 @@ setOutcome misses universes emptycells coord0 outcome =
           flip V.concatMap universes $ \(universe, remships) ->
           if coord .&. universe == Board 0 0
           then
-            flip V.concatMap (V.fromList [i | i <- [Destroyer .. Carrier], i `isInShipList` remships]) $ \ship ->
+            flip foldMap [i | i <- [Destroyer .. Carrier], i `isInShipList` remships] $ \ship ->
             flip V.map (V.filter (\placement ->
                                      placement .&. coord /= Board 0 0 &&
                                      placement .&. misses == Board 0 0 &&

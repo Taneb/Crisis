@@ -1,9 +1,14 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
 module Crisis.Util where
 
+import Control.Monad (liftM)
 import Data.Bits
-import Data.Vector (Vector)
-import qualified Data.Vector as V
+import qualified Data.Vector.Generic.Mutable as VGM
+import qualified Data.Vector.Generic as VG
+import Data.Vector.Unboxed (Vector)
+import qualified Data.Vector.Unboxed as V
 import Data.Word
 
 data Board = Board !Word64 !Word64
@@ -25,6 +30,36 @@ instance Bits Board where
   shift _ _ = undefined
   rotate _ _ = undefined
 
+newtype instance V.MVector s Board = MV_Board (V.MVector s (Word64, Word64))
+newtype instance V.Vector    Board = V_Board (V.Vector (Word64, Word64))
+
+instance VGM.MVector V.MVector Board where
+  {-# INLINE basicLength #-}
+  basicLength (MV_Board v) = VGM.basicLength v
+  {-# INLINE basicUnsafeSlice #-}
+  basicUnsafeSlice i j (MV_Board v) = MV_Board (VGM.basicUnsafeSlice i j v)
+  {-# INLINE basicUnsafeNew #-}
+  basicUnsafeNew i = liftM MV_Board (VGM.basicUnsafeNew i)
+  {-# INLINE basicUnsafeRead #-}
+  basicUnsafeRead (MV_Board v) i = liftM (uncurry Board) (VGM.basicUnsafeRead v i)
+  {-# INLINE basicUnsafeWrite #-}
+  basicUnsafeWrite (MV_Board v) i (Board x y) = VGM.basicUnsafeWrite v i (x, y)
+  {-# INLINE basicOverlaps #-}
+  basicOverlaps (MV_Board v) (MV_Board w) = VGM.basicOverlaps v w
+
+instance VG.Vector V.Vector Board where
+  {-# INLINE basicUnsafeFreeze #-}
+  basicUnsafeFreeze (MV_Board v) = liftM V_Board (VG.basicUnsafeFreeze v)
+  {-# INLINE basicUnsafeThaw #-}
+  basicUnsafeThaw (V_Board v) = liftM MV_Board (VG.basicUnsafeThaw v)
+  {-# INLINE basicLength #-}
+  basicLength (V_Board v) = VG.basicLength v
+  {-# INLINE basicUnsafeSlice #-}
+  basicUnsafeSlice i j (V_Board v) = V_Board (VG.basicUnsafeSlice i j v)
+  {-# INLINE basicUnsafeIndexM #-}
+  basicUnsafeIndexM (V_Board v) i = liftM (uncurry Board) (VG.basicUnsafeIndexM v i)
+
+instance V.Unbox Board
 
 data Ship =
   Destroyer  |

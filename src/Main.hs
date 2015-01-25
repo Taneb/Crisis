@@ -3,8 +3,8 @@ module Main (main) where
 import Control.Monad
 import Data.Bits
 import Data.List
-import Data.Vector (Vector)
-import qualified Data.Vector as V
+import Data.Vector.Unboxed (Vector)
+import qualified Data.Vector.Unboxed as V
 import System.Console.ANSI
 import System.Random
 

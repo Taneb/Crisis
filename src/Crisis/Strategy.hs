@@ -79,20 +79,17 @@ setOutcome misses universes emptycells coord0 outcome =
       newemptycells = emptycells .&. complement coord
       newuniverses =
         if outcome
-        then do
-          (universe, remships) <- universes
+        then
+          flip V.concatMap universes $ \(universe, remships) ->
           if coord .&. universe == Board 0 0
-            then do
-            ship <- V.fromList [i | i <- [Destroyer .. Carrier], i `isInShipList` remships]
-            placement <- allPositionsOf ship
-            guard $ placement .&. coord /= Board 0 0
-            guard $ placement .&. misses == Board 0 0
-            guard $ placement .&. universe == Board 0 0
-            return (universe .|. placement, remships - bit (fromEnum ship))
-            else return (universe, remships)
+          then
+            flip V.concatMap (V.fromList [i | i <- [Destroyer .. Carrier], i `isInShipList` remships]) $ \ship ->
+            flip V.map (V.filter (\placement ->
+                                     placement .&. coord /= Board 0 0 &&
+                                     placement .&. misses == Board 0 0 &&
+                                     placement .&. universe == Board 0 0) $ allPositionsOf ship) $ \placement ->
+            (universe .|. placement, remships - bit (fromEnum ship))
+          else V.singleton (universe, remships)
         else
-          do
-            (a, b) <- universes
-            guard $ coord .&. a == Board 0 0
-            return (a, b)
+          V.filter (\(a, _) -> coord .&. a == Board 0 0) universes
   in (if outcome then misses else misses .|. coord, newuniverses, newemptycells)

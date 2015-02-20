@@ -15,9 +15,6 @@ TODO: make chooseMove and setOutcome work in parallel
       I believe this can be done with repa with accelerate as a future goal.
 -}
 
-oiot :: [Int]
-oiot = [0..107]
-
 coordToBit :: (Int, Int) -> Int
 coordToBit (x, y) | y < 6 = x + 6 * y
                   | otherwise = x + 12 * y - 36
